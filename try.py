@@ -10,6 +10,7 @@ from load import readVocs, loadPrepareData
 from load import SOS_token, EOS_token, PAD_token
 from train import batch2TrainData
 import argparse
+from config import MAX_LENGTH, USE_CUDA, teacher_forcing_ratio, save_dir
 def parse():
     parser = argparse.ArgumentParser(description='Attention Seq2Seq Chatbot')
 
@@ -27,10 +28,10 @@ def parse():
     parser.add_argument('-b', '--batch_size', type=int, default=1, help='Batch size')
     parser.add_argument('-la', '--layer', type=int, default=1, help='Number of layers in encoder and decoder')
     
-    parser.add_argument('-hi', '--hidden', type=int, default=100, help='size of word vector')
+    parser.add_argument('-hi', '--hidden', type=int, default=50, help='size of word vector')
     
     parser.add_argument('-be', '--beam', type=int, default=1, help='Hidden size in encoder and decoder')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.01, help='Learning rate')
+    parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='Learning rate')
     parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
     
     parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
@@ -54,10 +55,10 @@ class NGramLanguageModeler(nn.Module):
         embeds = self.embeddings(inputs).view((1, -1))
         out = F.relu(self.linear1(embeds))
         out = self.linear2(out)
-        log_probs = F.log_softmax(out, dim=1)
-        return log_probs
+        log_probs = F.log_softmax(out)
+        return log_probs, embeds
 
-def train_word_vector(corpus, n_iteration, hidden_size, context_size):
+def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_rate):
 	#corpus_name = corpus.split('/')[-1].split('.')[0]
 	voc, pairs = loadPrepareData(corpus)
 	#print(corpus_name)
@@ -78,28 +79,30 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size):
 			trigram = ([test_sentence[j][i], test_sentence[j][i + 1]], test_sentence[j][i + 2])
 			trigrams.append(trigram)
 	#print the first 3, just so you can see what they look like
-	print(trigrams[:30])
+	#print(trigrams[:30])
 	#print(voc.n_words())
-'''
 
-	vocab = set(test_sentence)
-	word_to_ix = {word: i for i, word in enumerate(vocab)}
+
+	#vocab = set(test_sentence)
+	#word_to_ix = {word: i for i, word in enumerate(vocab)}
 
 
 	losses = []
 	loss_function = nn.NLLLoss()
-	model = NGramLanguageModeler(len(vocab), EMBEDDING_DIM, CONTEXT_SIZE)
-	optimizer = optim.SGD(model.parameters(), lr=0.001)
+	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+	optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
 	for epoch in range(n_iteration):
 	    total_loss = torch.Tensor([0])
 	    for context, target in trigrams:
-
+	    	#print("context: {}".format(context))
+	    	#print("target: {}".format(target))
+	    	
 	        # Step 1. Prepare the inputs to be passed to the model (i.e, turn the words
 	        # into integer indices and wrap them in variables)
-	        context_idxs = [word_to_ix[w] for w in context]
-	        context_var = autograd.Variable(torch.LongTensor(context_idxs))
-
+	        context_idxs = [voc.word2index[w] for w in context]
+	        context_var = Variable(torch.LongTensor(context_idxs))
+	        
 	        # Step 2. Recall that torch *accumulates* gradients. Before passing in a
 	        # new instance, you need to zero out the gradients from the old
 	        # instance
@@ -107,12 +110,12 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size):
 
 	        # Step 3. Run the forward pass, getting log probabilities over next
 	        # words
-	        log_probs = model(context_var)
+	        log_probs, embeds = model(context_var)
 
 	        # Step 4. Compute your loss function. (Again, Torch wants the target
 	        # word wrapped in a variable)
-	        loss = loss_function(log_probs, autograd.Variable(
-	            torch.LongTensor([word_to_ix[target]])))
+	        loss = loss_function(log_probs, Variable(
+	            torch.LongTensor([voc.word2index[target]])))
 
 	        # Step 5. Do the backward pass and update the gradient
 	        loss.backward()
@@ -121,15 +124,43 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size):
 	        total_loss += loss.data
 	    losses.append(total_loss)
 	print(losses)  # The loss decreased every iteration over the training data!
+	corpus_name = os.path.split(corpus)[-1].split('.')[0]
+	directory = os.path.join(save_dir, 'model', corpus_name, '{}'.format(hidden_size))
+	torch.save({
+                'iteration': iteration,
+                'w2v': model.state_dict(),
+                'w2v_opt': optimizer.state_dict(),
+                'loss': loss
+            }, os.path.join(directory, '{}_{}.tar'.format(iteration, 'backup_w2v_model')))
 
-'''
+def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
+	checkpoint = torch.load(modelFile)
+	voc, pairs = loadPrepareData(corpus)
+	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+	model.load_state_dict(checkpoint['w2v'])
+	model.train(False);
+	while(1):
+		test_word = input('>')
+		if test_word == 'q': break
+		else: 
+			get_word_vector(test_word, modelFile)
+def get_word_vector(model, test_word):
+	test_word_idxs = [voc.word2index[test_word]]
+	test_word_var = Variable(torch.LongTensor(test_word_idxs))
+	log_probs, embeds = model(test_word_var)
+	print(embeds.data)
+
+
+
 def run(args):
 	reverse, fil, n_iteration, print_every, save_every, learning_rate, n_layers, hidden_size, batch_size, beam_size, input = \
         args.reverse, args.filter, args.iteration, args.print, args.save, args.learning_rate, \
         args.layer, args.hidden, args.batch_size, args.beam, args.input
 	context_size = args.context_size
 	if args.train:
-	    train_word_vector(args.train, n_iteration, hidden_size, context_size)
+	    train_word_vector(args.train, n_iteration, hidden_size, context_size, learning_rate)
+	elif args.test:
+		test_word_vector(args.test, args.corpus, hidden_size, context_size)
     
 
 
