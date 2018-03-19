@@ -143,6 +143,8 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
 	print("Loss: {}".format(losses))  # The loss decreased every iteration over the training data!
 	corpus_name = os.path.split(corpus)[-1].split('.')[0]
 	directory = os.path.join(save_dir, 'model', corpus_name, '{}'.format(hidden_size))
+	if not os.path.exists(directory):
+		os.makedirs(directory)
 	torch.save({
 				'iteration': n_iteration,
 				'w2v': model.state_dict(),
@@ -160,13 +162,17 @@ def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 		test_word = input('>')
 		if test_word == 'q': break
 		else: 
-			get_word_vector(test_word, modelFile)
-def get_word_vector(model, test_word):
-	test_word_idxs = [voc.word2index[test_word]]
-	test_word_var = Variable(torch.LongTensor(test_word_idxs))
-	log_probs, embeds = model(test_word_var)
-	print(embeds.data)
-
+			get_word_vector(model, test_word, voc, EMBEDDING_DIM)
+def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
+	try:
+		test_word_idxs = [voc.word2index[test_word]]
+		test_word_var = Variable(torch.LongTensor(test_word_idxs))
+		log_probs, embeds = model(test_word_var)
+		print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
+		return embeds
+	except KeyError:
+		print("Incorrect spelling.")
+	
 
 
 def run(args):
