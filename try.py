@@ -23,7 +23,7 @@ def parse():
 
 	parser.add_argument('-tr', '--train', help='Train the model with corpus')
 
-	parser.add_argument('-te', '--test', help='Test the saved model')
+	parser.add_argument('-te', '--test', help='Test the saved w2v model')
 	parser.add_argument('-l', '--load', help='Load the model and train')
 	parser.add_argument('-c', '--corpus', help='Test the saved model with vocabulary of the corpus')
 	parser.add_argument('-r', '--reverse', action='store_true', help='Reverse the input sequence')
@@ -35,7 +35,7 @@ def parse():
 	parser.add_argument('-b', '--batch_size', type=int, default=64, help='Batch size')
 	parser.add_argument('-la', '--layer', type=int, default=1, help='Number of layers in encoder and decoder')
 
-	parser.add_argument('-hi', '--hidden', type=int, default=50, help='size of word vector')
+	parser.add_argument('-hi', '--hidden', type=int, default=50, help='size of word vectors')
 
 	parser.add_argument('-be', '--beam', type=int, default=1, help='Hidden size in encoder and decoder')
 	parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='Learning rate')
@@ -48,11 +48,6 @@ def parse():
 	parser.add_argument('-d2', '--dim2', help='The index of the second dimension.')
 	args = parser.parse_args()
 	return args
-
-
-
-
-
 
 class NGramLanguageModeler(nn.Module):
 
@@ -192,15 +187,11 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, dim1, di
 		new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
 		vectors2D = np.concatenate((vectors2D, [[new_word[dim1],new_word[dim2]]]), axis = 0)
 		index2vector[i] = [new_word]
-	'''
-	for i in range(10):
-		print(voc.index2word[i])
-		print(index2vector[i])
-	'''
+
 	corpus_name = os.path.split(corpus)[-1].split('.')[0]
 	vectors2D = vectors2D.reshape(2,nb_words)
 	plt.scatter(vectors2D[0],vectors2D[1], marker=".")
-	directory = os.path.join(save_dir, 'w2v_image', corpus_name, '{}_{}'.format(dim1, dim2))
+	directory = os.path.join(save_dir, 'w2v_image', corpus_name, 'dimension({},{})'.format(dim1, dim2))
 	if not os.path.exists(directory):
 		os.makedirs(directory)
 	directory = os.path.join(directory,'({}, {})vectors2D.png'.format(start_word, start_word + nb_words-1))
