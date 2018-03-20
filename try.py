@@ -14,6 +14,10 @@ from config import MAX_LENGTH, USE_CUDA, teacher_forcing_ratio, save_dir
 from tqdm import tqdm
 import random
 import os
+import numpy as np
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
 def parse():
 	parser = argparse.ArgumentParser(description='Attention Seq2Seq Chatbot')
 
@@ -39,6 +43,9 @@ def parse():
 
 	parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
 
+	parser.add_argument('-d', '--draw', help='Draw 2D word vector with the word vector model')
+	parser.add_argument('-d1', '--dim1', help='The index of the first dimension.')
+	parser.add_argument('-d2', '--dim2', help='The index of the second dimension.')
 	args = parser.parse_args()
 	return args
 
@@ -110,28 +117,21 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
 			tri_count += 1
 			#if(tri_count % 100 == 0):
 			#	print("{} trigrams fed in this iteration...".format(tri_count))
-			#print("context: {}".format(context))
-			#print("target: {}".format(target))
-
 			# Step 1. Prepare the inputs to be passed to the model (i.e, turn the words
 			# into integer indices and wrap them in variables)
 			context_idxs = [voc.word2index[w] for w in context]
 			context_var = Variable(torch.LongTensor(context_idxs))
-
 			# Step 2. Recall that torch *accumulates* gradients. Before passing in a
 			# new instance, you need to zero out the gradients from the old
 			# instance
 			model.zero_grad()
-
 			# Step 3. Run the forward pass, getting log probabilities over next
 			# words
 			log_probs, embeds = model(context_var)
-
 			# Step 4. Compute your loss function. (Again, Torch wants the target
 			# word wrapped in a variable)
 			loss = loss_function(log_probs, Variable(
 			    torch.LongTensor([voc.word2index[target]])))
-
 			# Step 5. Do the backward pass and update the gradient
 			loss.backward()
 			optimizer.step()
@@ -168,11 +168,43 @@ def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
 		test_word_idxs = [voc.word2index[test_word]]
 		test_word_var = Variable(torch.LongTensor(test_word_idxs))
 		log_probs, embeds = model(test_word_var)
-		print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
+		#print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
 		return embeds
 	except KeyError:
 		print("Incorrect spelling.")
 	
+def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, dim1, dim2):
+	dim1 = int(dim1)
+	dim2 = int(dim2)
+	checkpoint = torch.load(modelFile)
+	voc, pairs = loadPrepareData(corpus)
+	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+	model.load_state_dict(checkpoint['w2v'])
+	model.train(False);
+	new_word = voc.index2word[0]
+	new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
+	vectors2D = np.array([[new_word[dim1],new_word[dim2]]])
+	start_word = 2000
+	index2vector = {start_word:new_word}
+	nb_words = 1000
+	for i in range(start_word + 1, start_word + nb_words):
+		new_word = voc.index2word[i]
+		new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
+		vectors2D = np.concatenate((vectors2D, [[new_word[dim1],new_word[dim2]]]), axis = 0)
+		index2vector[i] = [new_word]
+	'''
+	for i in range(10):
+		print(voc.index2word[i])
+		print(index2vector[i])
+	'''
+	corpus_name = os.path.split(corpus)[-1].split('.')[0]
+	vectors2D = vectors2D.reshape(2,nb_words)
+	plt.scatter(vectors2D[0],vectors2D[1], marker=".")
+	directory = os.path.join(save_dir, 'w2v_image', corpus_name, '{}_{}'.format(dim1, dim2))
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+	directory = os.path.join(directory,'({}, {})vectors2D.png'.format(start_word, start_word + nb_words-1))
+	plt.savefig(directory, format='png')
 
 
 def run(args):
@@ -184,11 +216,10 @@ def run(args):
 		train_word_vector(args.train, n_iteration, hidden_size, context_size, learning_rate, batch_size)
 	elif args.test:
 		test_word_vector(args.test, args.corpus, hidden_size, context_size)
+	elif args.draw:
+		draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size, args.dim1, args.dim2)
     
-
 
 if __name__ == '__main__':
     args = parse()
     run(args)
-
-
