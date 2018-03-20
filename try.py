@@ -20,29 +20,22 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 def parse():
 	parser = argparse.ArgumentParser(description='Attention Seq2Seq Chatbot')
-
 	parser.add_argument('-tr', '--train', help='Train the model with corpus')
-
 	parser.add_argument('-te', '--test', help='Test the saved w2v model')
 	parser.add_argument('-l', '--load', help='Load the model and train')
 	parser.add_argument('-c', '--corpus', help='Test the saved model with vocabulary of the corpus')
 	parser.add_argument('-r', '--reverse', action='store_true', help='Reverse the input sequence')
 	parser.add_argument('-f', '--filter', action='store_true', help='Filter to small training data set')
 	parser.add_argument('-i', '--input', action='store_true', help='Test the model by input the sentence')
-
 	parser.add_argument('-it', '--iteration', type=int, default=10000, help='Train the model with it iterations')
 	parser.add_argument('-p', '--print', type=int, default=5000, help='Print every p iterations')
 	parser.add_argument('-b', '--batch_size', type=int, default=64, help='Batch size')
 	parser.add_argument('-la', '--layer', type=int, default=1, help='Number of layers in encoder and decoder')
-
 	parser.add_argument('-hi', '--hidden', type=int, default=50, help='size of word vectors')
-
 	parser.add_argument('-be', '--beam', type=int, default=1, help='Hidden size in encoder and decoder')
 	parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='Learning rate')
 	parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
-
 	parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
-
 	parser.add_argument('-d', '--draw', help='Draw 2D word vector with the word vector model')
 	parser.add_argument('-d1', '--dim1', help='The index of the first dimension.')
 	parser.add_argument('-d2', '--dim2', help='The index of the second dimension.')
