@@ -18,6 +18,8 @@ import numpy as np
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+import time
 def parse():
 	parser = argparse.ArgumentParser(description='Attention Seq2Seq Chatbot')
 	parser.add_argument('-tr', '--train', help='Train the model with corpus')
@@ -37,8 +39,6 @@ def parse():
 	parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
 	parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
 	parser.add_argument('-d', '--draw', help='Draw 2D word vector with the word vector model')
-	parser.add_argument('-d1', '--dim1', help='The index of the first dimension.')
-	parser.add_argument('-d2', '--dim2', help='The index of the second dimension.')
 	args = parser.parse_args()
 	return args
 
@@ -149,21 +149,22 @@ def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	while(1):
 		test_word = input('>')
 		if test_word == 'q': break
-		else: 
-			get_word_vector(model, test_word, voc, EMBEDDING_DIM)
+		else:
+			embeds = get_word_vector(model, voc.index2word[int(test_word)], voc, EMBEDDING_DIM)
+			print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
+				voc.word2count[voc.index2word[int(test_word)]]))
+			#print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
+def test_vector_relation():
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
 	try:
 		test_word_idxs = [voc.word2index[test_word]]
 		test_word_var = Variable(torch.LongTensor(test_word_idxs))
 		log_probs, embeds = model(test_word_var)
-		#print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
 		return embeds
 	except KeyError:
 		print("Incorrect spelling.")
 	
-def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, dim1, dim2):
-	dim1 = int(dim1)
-	dim2 = int(dim2)
+def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	checkpoint = torch.load(modelFile)
 	voc, pairs = loadPrepareData(corpus)
 	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
@@ -171,24 +172,40 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, dim1, di
 	model.train(False);
 	new_word = voc.index2word[0]
 	new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
-	vectors2D = np.array([[new_word[dim1],new_word[dim2]]])
-	start_word = 2000
+	vectors2D = np.array([new_word])
+	start_word = 0
 	index2vector = {start_word:new_word}
-	nb_words = 1000
+	nb_words = voc.n_words
+	below1000_count = 0
+	frequency_boundary = 100
 	for i in range(start_word + 1, start_word + nb_words):
 		new_word = voc.index2word[i]
-		new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
-		vectors2D = np.concatenate((vectors2D, [[new_word[dim1],new_word[dim2]]]), axis = 0)
-		index2vector[i] = [new_word]
+		if voc.word2count[new_word] <= frequency_boundary:
+			below1000_count += 1
+		else:
+			new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
+			vectors2D = np.concatenate((vectors2D, [new_word]), axis = 0)
+		#index2vector[i] = [new_word]
+	print("{} words out of {} words are in low frequency({} times).".format(\
+		below1000_count, voc.n_words, frequency_boundary))
+	print("Shape of vectors2D: {}".format(vectors2D.shape))
 
+	n_sne = nb_words
+	print("t-SNE processing...")
+	time_start = time.time()
+	tsne = TSNE()
+	tsne_results = tsne.fit_transform(vectors2D)
+	print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
 	corpus_name = os.path.split(corpus)[-1].split('.')[0]
-	vectors2D = vectors2D.reshape(2,nb_words)
-	plt.scatter(vectors2D[0],vectors2D[1], marker=".")
-	directory = os.path.join(save_dir, 'w2v_image', corpus_name, 'dimension({},{})'.format(dim1, dim2))
+	tsne_results = tsne_results.reshape(2,vectors2D.shape[0])
+	plt.scatter(tsne_results[0],tsne_results[1], marker=".")
+	directory = os.path.join(save_dir, 'w2v_image', corpus_name)
 	if not os.path.exists(directory):
 		os.makedirs(directory)
-	directory = os.path.join(directory,'({}, {})vectors2D.png'.format(start_word, start_word + nb_words-1))
+	directory = os.path.join(directory,'({}, {})b{}vectors2D.png'.format(start_word, \
+		start_word + nb_words-1, frequency_boundary))
 	plt.savefig(directory, format='png')
+	
 
 
 def run(args):
@@ -201,7 +218,7 @@ def run(args):
 	elif args.test:
 		test_word_vector(args.test, args.corpus, hidden_size, context_size)
 	elif args.draw:
-		draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size, args.dim1, args.dim2)
+		draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size)
     
 
 if __name__ == '__main__':
