@@ -24,6 +24,7 @@ def parse():
 	parser = argparse.ArgumentParser(description='Attention Seq2Seq Chatbot')
 	parser.add_argument('-tr', '--train', help='Train the model with corpus')
 	parser.add_argument('-te', '--test', help='Test the saved w2v model')
+	parser.add_argument('-ter', '--test_vector_relation', help='Test the saved w2v model')
 	parser.add_argument('-l', '--load', help='Load the model and train')
 	parser.add_argument('-c', '--corpus', help='Test the saved model with vocabulary of the corpus')
 	parser.add_argument('-r', '--reverse', action='store_true', help='Reverse the input sequence')
@@ -145,7 +146,7 @@ def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	voc, pairs = loadPrepareData(corpus)
 	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
 	model.load_state_dict(checkpoint['w2v'])
-	model.train(False);
+	model.train(False)
 	while(1):
 		test_word = input('>')
 		if test_word == 'q': break
@@ -154,7 +155,26 @@ def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 			print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
 				voc.word2count[voc.index2word[int(test_word)]]))
 			#print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
-def test_vector_relation():
+def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
+	checkpoint = torch.load(modelFile)
+	voc, pairs = loadPrepareData(corpus)
+	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+	model.load_state_dict(checkpoint['w2v'])
+	model.train(False)
+	test_word1 = "king"
+	test_word2 = "queen"
+	test_word3 = "man"
+	test_word4 = "woman"
+	test_word1 = get_word_vector(model, test_word1, voc, EMBEDDING_DIM)
+	test_word2 = get_word_vector(model, test_word2, voc, EMBEDDING_DIM)
+	test_word3 = get_word_vector(model, test_word3, voc, EMBEDDING_DIM)
+	test_word4 = get_word_vector(model, test_word4, voc, EMBEDDING_DIM)
+	distance1 = test_word1 - test_word2
+	distance2 = test_word3 - test_word4
+	cosine_similarity = np.dot(distance1, distance2)/(np.linalg.norm(distance1)*np.linalg.norm(distance2))
+	#numpy.dot(model['spain'], model['france'])/(numpy.linalg.norm(model['spain'])* numpy.linalg.norm(model['france']))
+	print(cosine_similarity)
+
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
 	try:
 		test_word_idxs = [voc.word2index[test_word]]
@@ -219,6 +239,8 @@ def run(args):
 		test_word_vector(args.test, args.corpus, hidden_size, context_size)
 	elif args.draw:
 		draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size)
+	elif args.test_vector_relation:
+		test_vector_relation(args.test_vector_relation, args.corpus, hidden_size, context_size)
     
 
 if __name__ == '__main__':
