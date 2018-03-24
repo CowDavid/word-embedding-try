@@ -151,29 +151,44 @@ def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 		test_word = input('>')
 		if test_word == 'q': break
 		else:
-			embeds = get_word_vector(model, voc.index2word[int(test_word)], voc, EMBEDDING_DIM)
-			print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
-				voc.word2count[voc.index2word[int(test_word)]]))
-			#print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
+			#embeds = get_word_vector(model, voc.index2word[int(test_word)], voc, EMBEDDING_DIM)
+			#print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
+			#	voc.word2count[voc.index2word[int(test_word)]]))
+			embeds = get_word_vector(model, test_word, voc, EMBEDDING_DIM)
+			print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
 def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	checkpoint = torch.load(modelFile)
 	voc, pairs = loadPrepareData(corpus)
 	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
 	model.load_state_dict(checkpoint['w2v'])
 	model.train(False)
-	test_word1 = "king"
-	test_word2 = "queen"
-	test_word3 = "man"
-	test_word4 = "woman"
-	test_word1 = get_word_vector(model, test_word1, voc, EMBEDDING_DIM)
-	test_word2 = get_word_vector(model, test_word2, voc, EMBEDDING_DIM)
-	test_word3 = get_word_vector(model, test_word3, voc, EMBEDDING_DIM)
-	test_word4 = get_word_vector(model, test_word4, voc, EMBEDDING_DIM)
-	distance1 = test_word1 - test_word2
-	distance2 = test_word3 - test_word4
-	cosine_similarity = np.dot(distance1, distance2)/(np.linalg.norm(distance1)*np.linalg.norm(distance2))
-	#numpy.dot(model['spain'], model['france'])/(numpy.linalg.norm(model['spain'])* numpy.linalg.norm(model['france']))
-	print(cosine_similarity)
+	test_word1 = np.array(get_word_vector(model, "king", voc, EMBEDDING_DIM).data)
+	test_word2 = np.array(get_word_vector(model, "queen", voc, EMBEDDING_DIM).data)
+	test_word3 = np.array(get_word_vector(model, "man", voc, EMBEDDING_DIM).data)
+	test_word4 = np.array(get_word_vector(model, "woman", voc, EMBEDDING_DIM).data)
+	vectors2D = np.concatenate(([test_word1], [test_word2], [test_word3], [test_word4]), axis = 0)
+	
+	time_start = time.time()
+	tsne = TSNE()
+	tsne_results = tsne.fit_transform(vectors2D)
+	print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
+	tsne_results = tsne_results.reshape(2,vectors2D.shape[0])
+	colors = ['b', 'c', 'y', 'm', 'r']
+	king = plt.scatter(tsne_results[0][0],tsne_results[1][0], marker="x", color=colors[0])
+	queen = plt.scatter(tsne_results[0][1],tsne_results[1][1], marker="o", color=colors[0])
+	man = plt.scatter(tsne_results[0][2],tsne_results[1][2], marker="x", color=colors[1])
+	woman = plt.scatter(tsne_results[0][3],tsne_results[1][3], marker="o", color=colors[1])
+	plt.legend((king, queen, man, woman),
+		('king', 'queen', 'man', 'woman'),
+		scatterpoints=1,
+        loc='lower right')
+	corpus_name = os.path.split(corpus)[-1].split('.')[0]
+	directory = os.path.join(save_dir, 'w2v_image', corpus_name)
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+	directory = os.path.join(directory,'relation_vectors2D.png')
+	plt.savefig(directory, format='png')
+	
 
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
 	try:
@@ -197,7 +212,7 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	index2vector = {start_word:new_word}
 	nb_words = voc.n_words
 	below1000_count = 0
-	frequency_boundary = 100
+	frequency_boundary = 500
 	for i in range(start_word + 1, start_word + nb_words):
 		new_word = voc.index2word[i]
 		if voc.word2count[new_word] <= frequency_boundary:
