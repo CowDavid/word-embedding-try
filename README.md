@@ -1,5 +1,5 @@
 # word-embedding-try
-訓練model:
+訓練model:/n
 	python try.py -tr ./data/movie_subtitles_en.txt -it 5000 -hi 300
 輸入index，印出frequency:
 	python try.py -te ./save/model/movie_subtitles_en/300/5000_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt -hi 300
