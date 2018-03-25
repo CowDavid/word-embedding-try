@@ -19,6 +19,7 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
+from scipy.stats import entropy
 import time
 def parse():
 	parser = argparse.ArgumentParser(description='Attention Seq2Seq Chatbot')
@@ -151,21 +152,62 @@ def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 		test_word = input('>')
 		if test_word == 'q': break
 		else:
-			#embeds = get_word_vector(model, voc.index2word[int(test_word)], voc, EMBEDDING_DIM)
-			#print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
-			#	voc.word2count[voc.index2word[int(test_word)]]))
-			embeds = get_word_vector(model, test_word, voc, EMBEDDING_DIM)
-			print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
+			embeds = get_word_vector(model, voc.index2word[int(test_word)], voc, EMBEDDING_DIM)
+			print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
+				voc.word2count[voc.index2word[int(test_word)]]))
+			#embeds = get_word_vector(model, test_word, voc, EMBEDDING_DIM)
+			#print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
 def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	checkpoint = torch.load(modelFile)
 	voc, pairs = loadPrepareData(corpus)
 	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
 	model.load_state_dict(checkpoint['w2v'])
 	model.train(False)
-	test_word1 = np.array(get_word_vector(model, "king", voc, EMBEDDING_DIM).data)
-	test_word2 = np.array(get_word_vector(model, "queen", voc, EMBEDDING_DIM).data)
-	test_word3 = np.array(get_word_vector(model, "man", voc, EMBEDDING_DIM).data)
-	test_word4 = np.array(get_word_vector(model, "woman", voc, EMBEDDING_DIM).data)
+	word1, word2, word3, word4 = "king", "queen", "man", "woman"
+	test_word1 = np.array(get_word_vector(model, word1, voc, EMBEDDING_DIM).data)
+	test_word2 = np.array(get_word_vector(model, word2, voc, EMBEDDING_DIM).data)
+	test_word3 = np.array(get_word_vector(model, word3, voc, EMBEDDING_DIM).data)
+	#test_word4 = np.array(get_word_vector(model, word4, voc, EMBEDDING_DIM).data)
+	test_word4_like = test_word3 - (test_word1 - test_word2)
+	#print(word1, ":\n",test_word1)#((test_word1 - test_word4_like) ** 2).mean(axis=None))
+	#print(word2, ":\n",test_word2)#((test_word2 - test_word4_like) ** 2).mean(axis=None))
+	#print(word3, ":\n",test_word3)#((test_word3 - test_word4_like) ** 2).mean(axis=None))
+	#print(word4, ":\n",test_word4)#((test_word4 - test_word4_like) ** 2).mean(axis=None))
+	#initial most_like
+	#i_vector = np.array(get_word_vector(model, word1, voc, EMBEDDING_DIM).data)#most distant vector
+	#initial_distance = ((i_vector - test_word4_like) ** 2).mean(axis=None)
+	#print("initial_distance: ", initial_distance)
+	
+	_1st, _2nd, _3rd, _4th = 99999999, 99999999, 99999999, 99999999
+	i_1st, i_2nd, i_3rd, i_4th = -1, -1, -1, -1
+	for i in tqdm(range(0, voc.n_words)):
+		i_vector = np.array(get_word_vector(model, voc.index2word[i], voc, EMBEDDING_DIM).data)
+		distance = ((i_vector - test_word4_like) ** 2).mean(axis=None)
+		#print(distance)
+		if distance < _1st:
+			_4th, _3rd, _2nd, _1st = _3rd, _2nd, _1st, distance
+			i_4th, i_3rd, i_2nd, i_1st = i_3rd, i_2nd, i_1st, i
+			#print("1st index:", i)
+		elif distance < _2nd:
+			_4th, _3rd, _2nd = _3rd, _2nd, distance
+			i_4th, i_3rd, i_2nd = i_3rd, i_2nd, i
+		elif distance < _3rd:
+			_4th, _3rd = _3rd, distance
+			i_4th, i_3rd = i_3rd, i
+		elif distance < _4th:
+			_4th = distance
+			i_4th = i
+	_1st_word = voc.index2word[i_1st]
+	_2nd_word = voc.index2word[i_2nd]
+	_3rd_word = voc.index2word[i_3rd]
+	_4th_word = voc.index2word[i_4th]
+	print("The most likely word of {} - ({} - {}) is {}".format(
+		word3, word1, word2, _1st_word))
+
+	print("Most likely words: {} > {} > {} > {} > other_words".format(_1st_word,
+		_2nd_word, _3rd_word, _4th_word))
+	
+	'''
 	vectors2D = np.concatenate(([test_word1], [test_word2], [test_word3], [test_word4]), axis = 0)
 	
 	time_start = time.time()
@@ -188,7 +230,7 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 		os.makedirs(directory)
 	directory = os.path.join(directory,'relation_vectors2D.png')
 	plt.savefig(directory, format='png')
-	
+	'''
 
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
 	try:
