@@ -2,7 +2,7 @@
 ### Source of the corpus
 https://github.com/Marsan-Ma/chat_corpus
 ### Source code
-The code aside from try.py is from https://github.com/ywk991112/pytorch-chatbot
+The codes aside from try.py is from https://github.com/ywk991112/pytorch-chatbot
 ### Training
 Run this command to start training, change the argument values in your own need.
 ```
