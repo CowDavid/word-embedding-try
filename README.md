@@ -1,4 +1,6 @@
 # word-embedding-try
+### Corpus source
+https://github.com/Marsan-Ma/chat_corpus
 ### Training
 Run this command to start training, change the argument values in your own need.
 ```
