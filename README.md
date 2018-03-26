@@ -2,7 +2,7 @@
 ### 訓練model:
 * python try.py -tr ./data/movie_subtitles_en.txt -it 5000 -hi 300
 > (optional) -lr learning_rate -b batch_size(即隨機取用batch_size個句子)
-### 用以儲存的model繼續train:
+### 用已儲存的model繼續train:
 * python try.py -tr ./data/movie_subtitles_en.txt -l <MODEL_FILE_PATH> -it 5000 -hi 300
 ### 輸入index，印出此字出現的次數:
 * python try.py -te ./save/model/movie_subtitles_en/300/5000_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt -hi 300
