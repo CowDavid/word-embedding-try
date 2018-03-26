@@ -9,7 +9,7 @@ Continue training with saved model:
 ```
 python try.py -tr ./data/movie_subtitles_en.txt -l <MODEL_FILE_PATH> -it 5000 -hi 300
 ```
-(optional arguments) -lr learning_rate -b batch_size(randomly extract some sentences with the number equals 'batch_size')
+(optional arguments) -lr learning_rate -b batch_size(randomly extract some sentences with the number equals to 'batch_size')
 #### Testing
 Input the index of a word, and then it prints out the times of the word appears in the corpus:
 ```
