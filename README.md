@@ -3,7 +3,6 @@
 ```
 python try.py -tr ./data/movie_subtitles_en.txt -it 5000 -hi 300
 ```
-> (optional) -lr learning_rate -b batch_size(即隨機取用batch_size個句子)
 
 Continue training with saved model:
 ```
