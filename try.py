@@ -41,6 +41,7 @@ def parse():
 	parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
 	parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
 	parser.add_argument('-d', '--draw', help='Draw 2D word vector with the word vector model')
+	parser.add_argument('-lo', '--loss', help='Draw the loss trend graph while the word vector model was being trained')
 	args = parser.parse_args()
 	return args
 
@@ -52,37 +53,44 @@ class NGramLanguageModeler(nn.Module):
 		self.vocab_size = vocab_size
 		super(NGramLanguageModeler, self).__init__()
 		self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-		self.linear1 = nn.Linear(embedding_dim, 128)
-		self.linear2 = nn.Linear(128, vocab_size)
+		self.linear1 = nn.Linear(embedding_dim, vocab_size)
+		#self.linear2 = nn.Linear(128, vocab_size)
 
 	def forward(self, inputs):
 		embeds = self.embeddings(inputs)
 		embeds = torch.sum(embeds, 0)
 		out = F.relu(self.linear1(embeds))
-		out = self.linear2(out)
+		#out = self.linear2(out)
 		log_probs = F.log_softmax(out, dim=0).view(1,self.vocab_size)
 		return log_probs, embeds
 
-def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_rate, batch_size):
-	#corpus_name = corpus.split('/')[-1].split('.')[0]
+def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_rate, batch_size, loadFilename=None):
 	voc, pairs = loadPrepareData(corpus)
-	#print(corpus_name)
-    # training data
-	#print(pairs[1])
+	corpus_name = os.path.split(corpus)[-1].split('.')[0]
 	CONTEXT_SIZE = context_size
 	EMBEDDING_DIM = hidden_size
-	test_sentence = []
-	for i in range(batch_size):
-		pair = random.choice(pairs)
-		test_sentence.append(pair[0].split())
-		test_sentence[i].insert(0,"SOS")
-		test_sentence[i].append("EOS")
-	#print(test_sentence[:3])
-	trigrams = []
-	for j in range(len(test_sentence)):
-		for i in range(len(test_sentence[j]) - 2):
-			trigram = ([test_sentence[j][i], test_sentence[j][i + 1]], test_sentence[j][i + 2])
-			trigrams.append(trigram)
+	try:
+		trigrams = torch.load(os.path.join(save_dir, 'training_data', corpus_name, 
+                                                   '{}_{}_{}.tar'.format(n_iteration, \
+                                                                         'training_batches', \
+                                                                         batch_size)))
+	except FileNotFoundError:
+		test_sentence = []
+		for i in range(batch_size):
+			pair = random.choice(pairs)
+			test_sentence.append(pair[0].split())
+			test_sentence[i].insert(0,"SOS")
+			test_sentence[i].append("EOS")
+		#print(test_sentence[:3])
+		trigrams = []
+		for j in range(len(test_sentence)):
+			for i in range(len(test_sentence[j]) - 2):
+				trigram = ([test_sentence[j][i], test_sentence[j][i + 1]], test_sentence[j][i + 2])
+				trigrams.append(trigram)
+		torch.save(trigrams, os.path.join(save_dir, 'training_data', corpus_name, 
+                                                  '{}_{}_{}.tar'.format(n_iteration, \
+                                                                        'training_batches', \
+                                                                        batch_size)))
 	#print the first 3, just so you can see what they look like
 	#print(trigrams[:30])
 	#print(voc.n_words())
@@ -91,12 +99,25 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
 	losses = []
 	loss_function = nn.NLLLoss()
 	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+
+	if loadFilename:
+		checkpoint = torch.load(loadFilename)
+		model.load_state_dict(checkpoint['w2v'])
+
 	optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+	if loadFilename:
+		optimizer.load_state_dict(checkpoint['w2v_opt'])
 	it_count = 0
 	tri_count = 0
 	print("There are {} trigrams.".format(len(trigrams)))
 	print("Total {} iterations.".format(n_iteration))
-	for epoch in tqdm(range(n_iteration)):
+
+	start_iteration = 1
+	if loadFilename:
+		start_iteration = checkpoint['iteration'] + 1
+		losses = checkpoint['losses']
+		print("{} iterations left...".format(n_iteration - start_iteration + 1))
+	for iteration in tqdm(range(start_iteration, n_iteration + 1)):
 		total_loss = torch.Tensor([0])
 		it_count += 1
 		tri_count = 0
@@ -127,11 +148,23 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
 			optimizer.step()
 			total_loss += loss.data
 		losses.append(total_loss)
+		save_every = 500
+		if (iteration % save_every == 0):
+			directory = os.path.join(save_dir, 'model', corpus_name, '{}'.format(hidden_size))
+			if not os.path.exists(directory):
+				os.makedirs(directory)
+			torch.save({
+					'iteration': iteration,
+					'w2v': model.state_dict(),
+					'w2v_opt': optimizer.state_dict(),
+					'loss': loss,
+					'losses': losses
+				}, os.path.join(directory, '{}_{}.tar'.format(iteration, 'backup_w2v_model')))
+         
 	print('\n')
 	print("Training completed!")
 	print('\n')
 	print("Loss: {}".format(losses))  # The loss decreased every iteration over the training data!
-	corpus_name = os.path.split(corpus)[-1].split('.')[0]
 	directory = os.path.join(save_dir, 'model', corpus_name, '{}'.format(hidden_size))
 	if not os.path.exists(directory):
 		os.makedirs(directory)
@@ -139,7 +172,8 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
 				'iteration': n_iteration,
 				'w2v': model.state_dict(),
 				'w2v_opt': optimizer.state_dict(),
-				'loss': loss
+				'loss': loss,
+				'losses':losses
 			}, os.path.join(directory, '{}_{}.tar'.format(n_iteration, 'backup_w2v_model')))
 
 def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
@@ -163,7 +197,7 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
 	model.load_state_dict(checkpoint['w2v'])
 	model.train(False)
-	word1, word2, word3, word4 = "king", "queen", "man", "woman"
+	word1, word2, word3, word4 = "up", "down", "right", "left"
 	test_word1 = np.array(get_word_vector(model, word1, voc, EMBEDDING_DIM).data)
 	test_word2 = np.array(get_word_vector(model, word2, voc, EMBEDDING_DIM).data)
 	test_word3 = np.array(get_word_vector(model, word3, voc, EMBEDDING_DIM).data)
@@ -231,7 +265,6 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	directory = os.path.join(directory,'relation_vectors2D.png')
 	plt.savefig(directory, format='png')
 	'''
-
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
 	try:
 		test_word_idxs = [voc.word2index[test_word]]
@@ -254,7 +287,7 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	index2vector = {start_word:new_word}
 	nb_words = voc.n_words
 	below1000_count = 0
-	frequency_boundary = 500
+	frequency_boundary = 100
 	for i in range(start_word + 1, start_word + nb_words):
 		new_word = voc.index2word[i]
 		if voc.word2count[new_word] <= frequency_boundary:
@@ -282,7 +315,18 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
 	directory = os.path.join(directory,'({}, {})b{}vectors2D.png'.format(start_word, \
 		start_word + nb_words-1, frequency_boundary))
 	plt.savefig(directory, format='png')
-	
+
+
+def loss_graph(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
+	corpus_name = os.path.split(corpus)[-1].split('.')[0]
+	checkpoint = torch.load(modelFile)
+	losses = checkpoint['losses']
+	plt.plot(losses)
+	directory = os.path.join(save_dir, 'w2v_image', corpus_name, 'loss_graph')
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+	directory = os.path.join(directory,'d{}_loss_graph.png'.format(EMBEDDING_DIM))
+	plt.savefig(directory, format='png')
 
 
 def run(args):
@@ -290,14 +334,19 @@ def run(args):
         args.reverse, args.filter, args.iteration, args.print, args.save, args.learning_rate, \
         args.layer, args.hidden, args.batch_size, args.beam, args.input
 	context_size = args.context_size
-	if args.train:
+	if args.train and not args.load:
 		train_word_vector(args.train, n_iteration, hidden_size, context_size, learning_rate, batch_size)
+	elif args.load:
+		train_word_vector(args.train, n_iteration, hidden_size, context_size, learning_rate, batch_size,
+		 loadFilename=args.load)
 	elif args.test:
 		test_word_vector(args.test, args.corpus, hidden_size, context_size)
 	elif args.draw:
 		draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size)
 	elif args.test_vector_relation:
 		test_vector_relation(args.test_vector_relation, args.corpus, hidden_size, context_size)
+	elif args.loss:
+		loss_graph(args.loss, args.corpus, hidden_size, context_size)
     
 
 if __name__ == '__main__':
