@@ -26,9 +26,9 @@ python try.py -te <MODEL_FILE_PATH> -c <CORPUS_FILE_PATH> -hi 300
 ### Draw Distribution Graph
 Draw the 2-dimensional distribution after doing dimension reduction using t-SNE(ignore the words in low frequency(frequency_boundary=500)).
 ```
-python try.py -d <MODEL_FILE_PATH> -c <CORPUS_FILE_PATH> -hi 300
+python try.py -d <MODEL_FILE_PATH> -c <CORPUS_FILE_PATH> -hi 300 -fb <FREQUENCY_BOUNDARY(default=1500)>
 ```
-> python try.py -d ./save/model/movie_subtitles_en/300/5000_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt -hi 300
+> python try.py -d ./save/model/movie_subtitles_en/300/5000_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt -hi 300 -fb 1500
 ###  Man - (King - Queen) = ?
 Print out the closest word of 'man' - ('king' - 'queen') in order to check if the model good or not.
 ```
