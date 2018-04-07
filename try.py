@@ -42,6 +42,7 @@ def parse():
     parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
     parser.add_argument('-d', '--draw', help='Draw 2D word vector with the word vector model')
     parser.add_argument('-lo', '--loss', help='Draw the loss trend graph while the word vector model was being trained')
+    parser.add_argument('-pr', '--predict', help='Predict the next word with previous 2 words.')
     args = parser.parse_args()
     return args
 
@@ -107,8 +108,6 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
     if loadFilename:
         optimizer.load_state_dict(checkpoint['w2v_opt'])
-    it_count = 0
-    tri_count = 0
     print("There are {} trigrams.".format(len(trigrams)))
     print("Total {} iterations.".format(n_iteration))
 
@@ -119,15 +118,7 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
         print("{} iterations left...".format(n_iteration - start_iteration + 1))
     for iteration in tqdm(range(start_iteration, n_iteration + 1)):
         total_loss = torch.Tensor([0])
-        it_count += 1
-        tri_count = 0
-        #if(it_count % 100 == 0):
-            #print('\n')
-            #print("Progressing iteration {}...".format(it_count))
         for context, target in trigrams:
-            tri_count += 1
-            #if(tri_count % 100 == 0):
-            #   print("{} trigrams fed in this iteration...".format(tri_count))
             # Step 1. Prepare the inputs to be passed to the model (i.e, turn the words
             # into integer indices and wrap them in variables)
             context_idxs = [voc.word2index[w] for w in context]
@@ -197,12 +188,13 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
     model.load_state_dict(checkpoint['w2v'])
     model.train(False)
-    word1, word2, word3, word4 = "heaven", "hell", "good", "bad"
+    word1, word2, word3, word4 = "heaven", "hell", "good", "cat"
     test_word1 = np.array(get_word_vector(model, word1, voc, EMBEDDING_DIM).data)
     test_word2 = np.array(get_word_vector(model, word2, voc, EMBEDDING_DIM).data)
     test_word3 = np.array(get_word_vector(model, word3, voc, EMBEDDING_DIM).data)
-    #test_word4 = np.array(get_word_vector(model, word4, voc, EMBEDDING_DIM).data)
+    test_word4 = np.array(get_word_vector(model, word4, voc, EMBEDDING_DIM).data)
     test_word4_like = test_word3 - (test_word1 - test_word2)
+    test_word4_like = test_word4
     #print(word1, ":\n",test_word1)#((test_word1 - test_word4_like) ** 2).mean(axis=None))
     #print(word2, ":\n",test_word2)#((test_word2 - test_word4_like) ** 2).mean(axis=None))
     #print(word3, ":\n",test_word3)#((test_word3 - test_word4_like) ** 2).mean(axis=None))
@@ -211,7 +203,7 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     #i_vector = np.array(get_word_vector(model, word1, voc, EMBEDDING_DIM).data)#most distant vector
     #initial_distance = ((i_vector - test_word4_like) ** 2).mean(axis=None)
     #print("initial_distance: ", initial_distance)
-    
+
     _1st, _2nd, _3rd, _4th = 99999999, 99999999, 99999999, 99999999
     i_1st, i_2nd, i_3rd, i_4th = -1, -1, -1, -1
     for i in tqdm(range(0, voc.n_words)):
@@ -235,12 +227,13 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     _2nd_word = voc.index2word[i_2nd]
     _3rd_word = voc.index2word[i_3rd]
     _4th_word = voc.index2word[i_4th]
-    print("The most likely word of {} - ({} - {}) is {}".format(
-        word3, word1, word2, _1st_word))
+    #print("The most likely word of {} - ({} - {}) is {}".format(
+    #   word3, word1, word2, _1st_word))
 
-    print("Most likely words: {} > {} > {} > {} > other_words".format(_1st_word,
-        _2nd_word, _3rd_word, _4th_word))
-    
+    #print("Most likely words of {} - ({} - {}): {} > {} > {} > {} > other_words".format(word3, word1, 
+    #    word2, _1st_word, _2nd_word, _3rd_word, _4th_word))
+    print("Most likely words of {}: {} > {} > {} > {} > other_words".format(word4,
+     _1st_word, _2nd_word, _3rd_word, _4th_word))
     '''
     vectors2D = np.concatenate(([test_word1], [test_word2], [test_word3], [test_word4]), axis = 0)
     
@@ -272,8 +265,7 @@ def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
         log_probs, embeds = model(test_word_var)
         return embeds
     except KeyError:
-        print("Incorrect spelling.")
-    
+        print("Incorrect spelling or unseen word.")
 def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     checkpoint = torch.load(modelFile)
     voc, pairs = loadPrepareData(corpus)
@@ -287,7 +279,7 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     index2vector = {start_word:new_word}
     nb_words = voc.n_words
     below1000_count = 0
-    frequency_boundary = 100
+    frequency_boundary = 1500
     for i in range(start_word + 1, start_word + nb_words):
         new_word = voc.index2word[i]
         if voc.word2count[new_word] <= frequency_boundary:
@@ -315,8 +307,6 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     directory = os.path.join(directory,'({}, {})b{}vectors2D.png'.format(start_word, \
         start_word + nb_words-1, frequency_boundary))
     plt.savefig(directory, format='png')
-
-
 def loss_graph(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     corpus_name = os.path.split(corpus)[-1].split('.')[0]
     checkpoint = torch.load(modelFile)
@@ -327,7 +317,29 @@ def loss_graph(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
         os.makedirs(directory)
     directory = os.path.join(directory,'d{}_loss_graph.png'.format(EMBEDDING_DIM))
     plt.savefig(directory, format='png')
-
+def predict_word(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
+    checkpoint = torch.load(modelFile)
+    voc, pairs = loadPrepareData(corpus)
+    model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+    model.load_state_dict(checkpoint['w2v'])
+    model.train(False)
+    print("Please input 2 space-separated words(input 'q' to exit)")
+    while(1):
+        test_word = input('>')
+        test_word = test_word.split()
+        if test_word[0] == 'q': break
+        if len(test_word) != 2:
+            print("You should input 2 words!")
+        else:
+            try:
+                test_word_idxs = [voc.word2index[w] for w in test_word]
+                test_word_var = Variable(torch.LongTensor(test_word_idxs))
+                log_probs, embeds = model(test_word_var)
+                _, i_predicted_word = torch.max(log_probs, 1)
+                print("The next word of '{} {}' is '{}'".format(test_word[0], 
+                    test_word[1], voc.index2word[i_predicted_word.data[0]]))
+            except KeyError:
+                print("Incorrect spelling or unseen word.")
 
 def run(args):
     reverse, fil, n_iteration, print_every, save_every, learning_rate, n_layers, hidden_size, batch_size, beam_size, input = \
@@ -347,6 +359,8 @@ def run(args):
         test_vector_relation(args.test_vector_relation, args.corpus, hidden_size, context_size)
     elif args.loss:
         loss_graph(args.loss, args.corpus, hidden_size, context_size)
+    elif args.predict:
+        predict_word(args.predict, args.corpus, hidden_size, context_size)
     
 
 if __name__ == '__main__':
