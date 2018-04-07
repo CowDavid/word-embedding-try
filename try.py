@@ -45,9 +45,7 @@ def parse():
     parser.add_argument('-pr', '--predict', help='Predict the next word with previous 2 words.')
     args = parser.parse_args()
     return args
-
 class NGramLanguageModeler(nn.Module):
-
     def __init__(self, vocab_size, embedding_dim, context_size):
         self.context_size = context_size
         self.embedding_dim = embedding_dim
@@ -64,7 +62,6 @@ class NGramLanguageModeler(nn.Module):
         #out = self.linear2(out)
         log_probs = F.log_softmax(out, dim=0).view(1,self.vocab_size)
         return log_probs, embeds
-
 def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_rate, batch_size, loadFilename=None):
     voc, pairs = loadPrepareData(corpus)
     corpus_name = os.path.split(corpus)[-1].split('.')[0]
@@ -166,7 +163,6 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
                 'loss': loss,
                 'losses':losses
             }, os.path.join(directory, '{}_{}.tar'.format(n_iteration, 'backup_w2v_model')))
-
 def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     checkpoint = torch.load(modelFile)
     voc, pairs = loadPrepareData(corpus)
@@ -273,25 +269,27 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     model.load_state_dict(checkpoint['w2v'])
     model.train(False);
     new_word = voc.index2word[0]
+    labels = [new_word]
     new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
     vectors2D = np.array([new_word])
     start_word = 0
     index2vector = {start_word:new_word}
     nb_words = voc.n_words
     below1000_count = 0
-    frequency_boundary = 1500
+    frequency_boundary = 300
     for i in range(start_word + 1, start_word + nb_words):
         new_word = voc.index2word[i]
         if voc.word2count[new_word] <= frequency_boundary:
             below1000_count += 1
         else:
+            labels.append(new_word)
             new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
             vectors2D = np.concatenate((vectors2D, [new_word]), axis = 0)
         #index2vector[i] = [new_word]
     print("{} words out of {} words are in low frequency({} times).".format(\
         below1000_count, voc.n_words, frequency_boundary))
     print("Shape of vectors2D: {}".format(vectors2D.shape))
-
+    
     n_sne = nb_words
     print("t-SNE processing...")
     time_start = time.time()
@@ -300,7 +298,14 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
     corpus_name = os.path.split(corpus)[-1].split('.')[0]
     tsne_results = tsne_results.reshape(2,vectors2D.shape[0])
-    plt.scatter(tsne_results[0],tsne_results[1], marker=".")
+    plt.scatter(tsne_results[0], tsne_results[1], marker=".")
+    
+    for label, x, y in zip(labels, tsne_results[0], tsne_results[1]):
+        plt.annotate(
+            label,
+            xy=(x, y), xytext=(0, 0),
+            textcoords='offset points', ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0', fc='yellow', alpha=0))
     directory = os.path.join(save_dir, 'w2v_image', corpus_name)
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -361,7 +366,6 @@ def run(args):
         loss_graph(args.loss, args.corpus, hidden_size, context_size)
     elif args.predict:
         predict_word(args.predict, args.corpus, hidden_size, context_size)
-    
 
 if __name__ == '__main__':
     args = parse()
