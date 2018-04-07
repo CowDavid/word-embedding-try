@@ -9,6 +9,7 @@ Run this command to start training, change the argument values in your own need.
 python try.py -tr <CORPUS_FILE_PATH> -it 5000 -hi 300
 ```
 > python try.py -tr ./data/movie_subtitles_en.txt -it 5000 -hi 300
+
 Continue training with saved model.
 ```
 python try.py -tr <CORPUS_FILE_PATH> -l <MODEL_FILE_PATH> -it 5000 -hi 300
