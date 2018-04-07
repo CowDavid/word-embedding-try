@@ -41,6 +41,7 @@ def parse():
     parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
     parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
     parser.add_argument('-d', '--draw', help='Draw 2D word vector with the word vector model')
+    parser.add_argument('-fb', '--frequency_boundary', type=int, default=1500, help='The frequency_boundary of the 2D graph')
     parser.add_argument('-lo', '--loss', help='Draw the loss trend graph while the word vector model was being trained')
     parser.add_argument('-pr', '--predict', help='Predict the next word with previous 2 words.')
     args = parser.parse_args()
@@ -262,7 +263,7 @@ def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
         return embeds
     except KeyError:
         print("Incorrect spelling or unseen word.")
-def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
+def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary):
     checkpoint = torch.load(modelFile)
     voc, pairs = loadPrepareData(corpus)
     model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
@@ -276,7 +277,7 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     index2vector = {start_word:new_word}
     nb_words = voc.n_words
     below1000_count = 0
-    frequency_boundary = 300
+    #frequency_boundary = 1600
     for i in range(start_word + 1, start_word + nb_words):
         new_word = voc.index2word[i]
         if voc.word2count[new_word] <= frequency_boundary:
@@ -359,7 +360,7 @@ def run(args):
     elif args.test:
         test_word_vector(args.test, args.corpus, hidden_size, context_size)
     elif args.draw:
-        draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size)
+        draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size, args.frequency_boundary)
     elif args.test_vector_relation:
         test_vector_relation(args.test_vector_relation, args.corpus, hidden_size, context_size)
     elif args.loss:
