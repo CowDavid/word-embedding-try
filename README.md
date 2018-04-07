@@ -41,3 +41,9 @@ Draw the loss graph
 python try.py -lo <MODEL_FILE_PATH> -c <CORPUS_FILE_PATH> -hi 300
 ```
 > python try.py -lo ./save/model/movie_subtitles_en/300/2500_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt -hi 300
+### Predict word
+Predict the next word with previous two words
+```
+python try.py -pr <MODEL_FILE_PATH> -c <CORPUS_FILE_PATH> -hi 300
+```
+>  python try.py -pr ./save/model/movie_subtitles_en/300/2500_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt -hi 300
