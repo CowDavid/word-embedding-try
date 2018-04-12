@@ -41,6 +41,7 @@ def parse():
     parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
     parser.add_argument('-co', '--context_size', type=int, default=2, help='The (n-1) of the n-gram')
     parser.add_argument('-d', '--draw', help='Draw 2D word vector with the word vector model')
+    parser.add_argument('-dm', '--draw_manually', help='Draw 2D word vector manually')
     parser.add_argument('-fb', '--frequency_boundary', type=int, default=1500, help='The frequency_boundary of the 2D graph')
     parser.add_argument('-lo', '--loss', help='Draw the loss trend graph while the word vector model was being trained')
     parser.add_argument('-pr', '--predict', help='Predict the next word with previous 2 words.')
@@ -191,15 +192,7 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     test_word3 = np.array(get_word_vector(model, word3, voc, EMBEDDING_DIM).data)
     test_word4 = np.array(get_word_vector(model, word4, voc, EMBEDDING_DIM).data)
     test_word4_like = test_word3 - (test_word1 - test_word2)
-    test_word4_like = test_word4
-    #print(word1, ":\n",test_word1)#((test_word1 - test_word4_like) ** 2).mean(axis=None))
-    #print(word2, ":\n",test_word2)#((test_word2 - test_word4_like) ** 2).mean(axis=None))
-    #print(word3, ":\n",test_word3)#((test_word3 - test_word4_like) ** 2).mean(axis=None))
-    #print(word4, ":\n",test_word4)#((test_word4 - test_word4_like) ** 2).mean(axis=None))
-    #initial most_like
-    #i_vector = np.array(get_word_vector(model, word1, voc, EMBEDDING_DIM).data)#most distant vector
-    #initial_distance = ((i_vector - test_word4_like) ** 2).mean(axis=None)
-    #print("initial_distance: ", initial_distance)
+    #test_word4_like = test_word4
 
     _1st, _2nd, _3rd, _4th = 99999999, 99999999, 99999999, 99999999
     i_1st, i_2nd, i_3rd, i_4th = -1, -1, -1, -1
@@ -224,37 +217,9 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     _2nd_word = voc.index2word[i_2nd]
     _3rd_word = voc.index2word[i_3rd]
     _4th_word = voc.index2word[i_4th]
-    #print("The most likely word of {} - ({} - {}) is {}".format(
-    #   word3, word1, word2, _1st_word))
-
-    #print("Most likely words of {} - ({} - {}): {} > {} > {} > {} > other_words".format(word3, word1, 
-    #    word2, _1st_word, _2nd_word, _3rd_word, _4th_word))
     print("Most likely words of {}: {} > {} > {} > {} > other_words".format(word4,
      _1st_word, _2nd_word, _3rd_word, _4th_word))
-    '''
-    vectors2D = np.concatenate(([test_word1], [test_word2], [test_word3], [test_word4]), axis = 0)
     
-    time_start = time.time()
-    tsne = TSNE()
-    tsne_results = tsne.fit_transform(vectors2D)
-    print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
-    tsne_results = tsne_results.reshape(2,vectors2D.shape[0])
-    colors = ['b', 'c', 'y', 'm', 'r']
-    king = plt.scatter(tsne_results[0][0],tsne_results[1][0], marker="x", color=colors[0])
-    queen = plt.scatter(tsne_results[0][1],tsne_results[1][1], marker="o", color=colors[0])
-    man = plt.scatter(tsne_results[0][2],tsne_results[1][2], marker="x", color=colors[1])
-    woman = plt.scatter(tsne_results[0][3],tsne_results[1][3], marker="o", color=colors[1])
-    plt.legend((king, queen, man, woman),
-        ('king', 'queen', 'man', 'woman'),
-        scatterpoints=1,
-        loc='lower right')
-    corpus_name = os.path.split(corpus)[-1].split('.')[0]
-    directory = os.path.join(save_dir, 'w2v_image', corpus_name)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    directory = os.path.join(directory,'relation_vectors2D.png')
-    plt.savefig(directory, format='png')
-    '''
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
     try:
         test_word_idxs = [voc.word2index[test_word]]
@@ -263,6 +228,45 @@ def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
         return embeds
     except KeyError:
         print("Incorrect spelling or unseen word.")
+def draw_manually(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary):
+    checkpoint = torch.load(modelFile)
+    voc, pairs = loadPrepareData(corpus)
+    model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+    model.load_state_dict(checkpoint['w2v'])
+    model.train(False);
+    words = input("Input space-separated words: ").split()
+    labels = [words[0]]
+    new_word = np.array(get_word_vector(model, words[0], voc, EMBEDDING_DIM).data)
+    vectors2D = np.array([new_word])
+    for w in words[1:]:
+        labels.append(w)
+        new_word = np.array(get_word_vector(model, w, voc, EMBEDDING_DIM).data)
+        vectors2D = np.concatenate((vectors2D, [new_word]), axis = 0)
+    print("Shape of vectors2D: {}".format(vectors2D.shape))
+    file_name = 'manually_{}.png'.format(words[0])
+    tsne(corpus, len(words), vectors2D, labels, file_name)
+
+def tsne(corpus, n_sne, vectors2D, labels, file_name):
+    print("t-SNE processing...")
+    time_start = time.time()
+    tsne = TSNE()
+    tsne_results = tsne.fit_transform(vectors2D)
+    print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
+    corpus_name = os.path.split(corpus)[-1].split('.')[0]
+    tsne_results = tsne_results.reshape(2,vectors2D.shape[0])
+    plt.scatter(tsne_results[0], tsne_results[1], marker=".")
+    for label, x, y in zip(labels, tsne_results[0], tsne_results[1]):
+        plt.annotate(
+            label,
+            xy=(x, y), xytext=(0, 0),
+            textcoords='offset points', ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0', fc='yellow', alpha=0))
+    directory = os.path.join(save_dir, 'w2v_image', corpus_name)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    directory = os.path.join(directory, file_name)
+    plt.savefig(directory, format='png')
+
 def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary):
     checkpoint = torch.load(modelFile)
     voc, pairs = loadPrepareData(corpus)
@@ -290,29 +294,10 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequenc
     print("{} words out of {} words are in low frequency({} times).".format(\
         below1000_count, voc.n_words, frequency_boundary))
     print("Shape of vectors2D: {}".format(vectors2D.shape))
+    file_name = '({}, {})b{}vectors2D.png'.format(start_word, \
+        start_word + nb_words-1, frequency_boundary)
+    tsne(corpus, nb_words, vectors2D, labels, file_name)
     
-    n_sne = nb_words
-    print("t-SNE processing...")
-    time_start = time.time()
-    tsne = TSNE()
-    tsne_results = tsne.fit_transform(vectors2D)
-    print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
-    corpus_name = os.path.split(corpus)[-1].split('.')[0]
-    tsne_results = tsne_results.reshape(2,vectors2D.shape[0])
-    plt.scatter(tsne_results[0], tsne_results[1], marker=".")
-    
-    for label, x, y in zip(labels, tsne_results[0], tsne_results[1]):
-        plt.annotate(
-            label,
-            xy=(x, y), xytext=(0, 0),
-            textcoords='offset points', ha='right', va='bottom',
-            bbox=dict(boxstyle='round,pad=0', fc='yellow', alpha=0))
-    directory = os.path.join(save_dir, 'w2v_image', corpus_name)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    directory = os.path.join(directory,'({}, {})b{}vectors2D.png'.format(start_word, \
-        start_word + nb_words-1, frequency_boundary))
-    plt.savefig(directory, format='png')
 def loss_graph(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     corpus_name = os.path.split(corpus)[-1].split('.')[0]
     checkpoint = torch.load(modelFile)
@@ -361,6 +346,8 @@ def run(args):
         test_word_vector(args.test, args.corpus, hidden_size, context_size)
     elif args.draw:
         draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size, args.frequency_boundary)
+    elif args.draw_manually:
+        draw_manually(args.draw_manually, args.corpus, hidden_size, context_size, args.frequency_boundary)
     elif args.test_vector_relation:
         test_vector_relation(args.test_vector_relation, args.corpus, hidden_size, context_size)
     elif args.loss:
