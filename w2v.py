@@ -187,12 +187,13 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     model.load_state_dict(checkpoint['w2v'])
     model.train(False)
     word1, word2, word3, word4 = "heaven", "hell", "good", "cat"
+    word4 = input('>')
     test_word1 = np.array(get_word_vector(model, word1, voc, EMBEDDING_DIM).data)
     test_word2 = np.array(get_word_vector(model, word2, voc, EMBEDDING_DIM).data)
     test_word3 = np.array(get_word_vector(model, word3, voc, EMBEDDING_DIM).data)
     test_word4 = np.array(get_word_vector(model, word4, voc, EMBEDDING_DIM).data)
-    test_word4_like = test_word3 - (test_word1 - test_word2)
-    #test_word4_like = test_word4
+    #test_word4_like = test_word3 - (test_word1 - test_word2)
+    test_word4_like = test_word4
 
     _1st, _2nd, _3rd, _4th = 99999999, 99999999, 99999999, 99999999
     i_1st, i_2nd, i_3rd, i_4th = -1, -1, -1, -1
@@ -218,8 +219,7 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     _3rd_word = voc.index2word[i_3rd]
     _4th_word = voc.index2word[i_4th]
     print("Most likely words of {}: {} > {} > {} > {} > other_words".format(word4,
-     _1st_word, _2nd_word, _3rd_word, _4th_word))
-    
+     _1st_word, _2nd_word, _3rd_word, _4th_word)) 
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
     try:
         test_word_idxs = [voc.word2index[test_word]]
@@ -243,9 +243,8 @@ def draw_manually(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boun
         new_word = np.array(get_word_vector(model, w, voc, EMBEDDING_DIM).data)
         vectors2D = np.concatenate((vectors2D, [new_word]), axis = 0)
     print("Shape of vectors2D: {}".format(vectors2D.shape))
-    file_name = 'manually_{}.png'.format(words[0])
+    file_name = 'manually_{}2{}.png'.format(words[0], words[-1])
     tsne(corpus, len(words), vectors2D, labels, file_name)
-
 def tsne(corpus, n_sne, vectors2D, labels, file_name):
     print("t-SNE processing...")
     time_start = time.time()
@@ -266,7 +265,6 @@ def tsne(corpus, n_sne, vectors2D, labels, file_name):
         os.makedirs(directory)
     directory = os.path.join(directory, file_name)
     plt.savefig(directory, format='png')
-
 def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary):
     checkpoint = torch.load(modelFile)
     voc, pairs = loadPrepareData(corpus)
@@ -297,7 +295,6 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequenc
     file_name = '({}, {})b{}vectors2D.png'.format(start_word, \
         start_word + nb_words-1, frequency_boundary)
     tsne(corpus, nb_words, vectors2D, labels, file_name)
-    
 def loss_graph(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     corpus_name = os.path.split(corpus)[-1].split('.')[0]
     checkpoint = torch.load(modelFile)
