@@ -35,8 +35,8 @@ Draw the 2-dimensional distribution after doing dimension reduction using t-SNE(
 python w2v.py -dm <MODEL_FILE_PATH> -c <CORPUS_FILE_PATH> -hi 300 
 ```
 > python w2v.py -dm ./save/model/movie_subtitles_en/300/2500_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt -hi 300
-###  Man - (King - Queen) = ?
-Print out the closest word of 'man' - ('king' - 'queen') in order to check if the model good or not.
+### Most Likely Word
+Print out the closest word of the word you input in order to check if the model good or not.
 ```
 python w2v.py -ter <MODEL_FILE_PATH> -c <CORPUS_FILE_PATH> -hi 300
 ```
