@@ -6,7 +6,7 @@ The codes aside from w2v.py are from https://github.com/ywk991112/pytorch-chatbo
 ### Training
 Run this command to start training, change the argument values in your own need.
 ```
-python w2v.py -tr <CORPUS_FILE_PATH> -it 5000 -hi 300
+python w2v.py -tr <CORPUS_FILE_PATH> -it 2500 -hi 300 -b 128
 ```
 > python w2v.py -tr ./data/movie_subtitles_en.txt -it 5000 -hi 300
 
