@@ -200,6 +200,8 @@ def trainIters(corpus, pre_modelFile, reverse, n_iteration, learning_rate, batch
     pretrained_model.load_state_dict(pre_checkpoint['w2v'])
     pretrained_model.train(False)
     embedding = pretrained_model
+    if USE_CUDA:
+        embedding = embedding.cuda()
     #-----------------------------------------------------------------
     #replace embedding by pretrained_model
     encoder = EncoderRNN(voc.n_words, hidden_size, embedding, n_layers)
