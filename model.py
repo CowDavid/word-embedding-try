@@ -5,7 +5,24 @@ import torch.nn.functional as F
 import sys
 
 from config import USE_CUDA, MAX_LENGTH
+class NGramLanguageModeler(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, context_size):
+        self.context_size = context_size
+        self.embedding_dim = embedding_dim
+        self.vocab_size = vocab_size
+        super(NGramLanguageModeler, self).__init__()
+        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        self.linear1 = nn.Linear(embedding_dim, vocab_size)
+        #self.linear2 = nn.Linear(128, vocab_size)
 
+    def forward(self, inputs):
+        embeds = self.embeddings(inputs)
+        embeds = torch.sum(embeds, 0)
+        out = F.relu(self.linear1(embeds))
+        #out = self.linear2(out)
+        log_probs = F.log_softmax(out, dim=0).view(1,self.vocab_size)
+        return log_probs, embeds
+        
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size, embedding, n_layers=1, dropout=0.1):
         super(EncoderRNN, self).__init__()
@@ -16,7 +33,7 @@ class EncoderRNN(nn.Module):
         self.gru = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
 
     def forward(self, input_seq, input_lengths, hidden=None):
-        embedded = self.embedding(input_seq)
+        log_probs, embedded = self.embedding(input_seq)
         packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
         outputs, hidden = self.gru(packed, hidden) # output: (seq_len, batch, hidden*n_dir)
         outputs, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(outputs)
@@ -99,7 +116,7 @@ class LuongAttnDecoderRNN(nn.Module):
         # Note: we run this one step at a time
 
         # Get the embedding of the current input word (last output word)
-        embedded = self.embedding(input_seq)
+        log_probs, embedded = self.embedding(input_seq)
         embedded = self.embedding_dropout(embedded) #[1, 64, 512]
         if(embedded.size(0) != 1):
             raise ValueError('Decoder input sequence length should be 1')
