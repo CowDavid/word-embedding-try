@@ -21,7 +21,7 @@ def parse():
     parser.add_argument('-be', '--beam', type=int, default=1, help='Hidden size in encoder and decoder')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.01, help='Learning rate')
     parser.add_argument('-s', '--save', type=float, default=10000, help='Save every s iterations')
-
+    parser.add_argument('-pre', '--pretrained_model', help='Pretrained tri-gram model')
     args = parser.parse_args()
     return args
 
@@ -40,11 +40,11 @@ def run(args):
         args.reverse, args.filter, args.iteration, args.print, args.save, args.learning_rate, \
         args.layer, args.hidden, args.batch_size, args.beam, args.input
     if args.train and not args.load:
-        trainIters(args.train, reverse, n_iteration, learning_rate, batch_size,
+        trainIters(args.train, args.pretrained_model, reverse, n_iteration, learning_rate, batch_size,
                     n_layers, hidden_size, print_every, save_every)
     elif args.load:
         n_layers, hidden_size, reverse = parseFilename(args.load)
-        trainIters(args.train, reverse, n_iteration, learning_rate, batch_size,
+        trainIters(args.train, args.pretrained_model, reverse, n_iteration, learning_rate, batch_size,
                     n_layers, hidden_size, print_every, save_every, loadFilename=args.load)
     elif args.test:
         n_layers, hidden_size, reverse = parseFilename(args.test, True)
