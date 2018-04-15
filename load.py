@@ -12,10 +12,10 @@ PAD_token = 2
 class Voc:
     def __init__(self, name):
         self.name = name
-        self.word2index = {"SOS":0, "EOS":1, "PAD":2}
-        self.word2count = {"SOS":1, "EOS":1, "PAD":1}
-        self.index2word = {0: "SOS", 1: "EOS", 2:"PAD"}
-        self.n_words = 3  # Count SOS and EOS
+        self.word2index = {"SOS":0, "EOS":1, "PAD":2, "UNK":3}
+        self.word2count = {"SOS":1, "EOS":1, "PAD":1, "UNK":1}
+        self.index2word = {0: "SOS", 1: "EOS", 2:"PAD", 3:"UNK"}
+        self.n_words = 4  # Count SOS and EOS
 
     def addSentence(self, sentence):
         for word in sentence.split(' '):
@@ -96,4 +96,39 @@ def loadPrepareData(corpus):
     except FileNotFoundError:
         print("Saved data not found, start preparing training data ...")
         voc, pairs = prepareData(corpus, corpus_name)
+    #--------------------------------------------------------
+    #my code
+    original_n_words = voc.n_words
+    for i in range(4, voc.n_words):
+        word = voc.index2word[i]
+        if voc.word2count[word] <= 2:
+            del voc.word2index[word]
+            del voc.word2count[word]
+            voc.index2word[i] = 'UNK'
+            voc.word2count['UNK'] += 1
+            voc.n_words -= 1
+    i_vacant = 4
+    for i in range(4, original_n_words):
+        word = voc.index2word[i]
+        if word != 'UNK':
+            voc.index2word[i_vacant] = word
+            voc.word2index[word] = i_vacant
+            if i != i_vacant:
+                del voc.index2word[i]
+            i_vacant += 1
+        else:
+            del voc.index2word[i]
+    print("original_n_words: ", original_n_words)
+
+    print("Low frequency words are stripped off, {} words left...".format(voc.n_words))
+    #--------------------------------------------------------
     return voc, pairs
+def voc_test(voc, pairs, original_n_words):
+    for i in range(original_n_words):
+        try:
+            k = voc.index2word[i]
+        except KeyError:
+            print("Total number of words: ", i-1)
+            print("last word:", k)
+            break
+
