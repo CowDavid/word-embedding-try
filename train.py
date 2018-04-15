@@ -15,7 +15,7 @@ import os
 from tqdm import tqdm
 from load import loadPrepareData
 from load import SOS_token, EOS_token, PAD_token
-from model import EncoderRNN, LuongAttnDecoderRNN, Attn
+from model import EncoderRNN, LuongAttnDecoderRNN, Attn, NGramLanguageModeler
 from config import MAX_LENGTH, USE_CUDA, teacher_forcing_ratio, save_dir
 # from plot import plotPerplexity
 
@@ -35,7 +35,14 @@ def filename(reverse, obj):
 # Prepare Training Data
 #############################################
 def indexesFromSentence(voc, sentence):
-    return [voc.word2index[word] for word in sentence.split(' ')] + [EOS_token]
+    output = []
+    for word in sentence.split(' '):
+        if word in voc.word2index:
+            output.append(voc.word2index[word])
+        else:
+            output.append(voc.word2index['UNK'])
+    return output + [EOS_token]
+    #return [voc.word2index[word] for word in sentence.split(' ')] + [EOS_token]
 
 # batch_first: true -> false, i.e. shape: seq_len * batch
 def zeroPadding(l, fillvalue=PAD_token):
@@ -159,7 +166,7 @@ def train(input_variable, lengths, target_variable, mask, max_target_len, encode
     return sum(print_losses) / n_totals 
 
 
-def trainIters(corpus, reverse, n_iteration, learning_rate, batch_size, n_layers, hidden_size, 
+def trainIters(corpus, pre_modelFile, reverse, n_iteration, learning_rate, batch_size, n_layers, hidden_size, 
                 print_every, save_every, loadFilename=None, attn_model='dot', decoder_learning_ratio=5.0):
 
     voc, pairs = loadPrepareData(corpus)
@@ -183,7 +190,18 @@ def trainIters(corpus, reverse, n_iteration, learning_rate, batch_size, n_layers
     # model
     checkpoint = None 
     print('Building encoder and decoder ...')
-    embedding = nn.Embedding(voc.n_words, hidden_size)
+    #embedding = nn.Embedding(voc.n_words, hidden_size)
+    #-----------------------------------------------------------------
+    #my code
+    EMBEDDING_DIM = 300
+    CONTEXT_SIZE = 2
+    pre_checkpoint = torch.load(pre_modelFile)
+    pretrained_model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+    pretrained_model.load_state_dict(pre_checkpoint['w2v'])
+    pretrained_model.train(False)
+    embedding = pretrained_model
+    #-----------------------------------------------------------------
+    #replace embedding by pretrained_model
     encoder = EncoderRNN(voc.n_words, hidden_size, embedding, n_layers)
     attn_model = 'dot'
     decoder = LuongAttnDecoderRNN(attn_model, embedding, hidden_size, voc.n_words, n_layers)
