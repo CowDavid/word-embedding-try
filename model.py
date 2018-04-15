@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import sys
 
 from config import USE_CUDA, MAX_LENGTH
+import numpy as np
 class NGramLanguageModeler(nn.Module):
     def __init__(self, vocab_size, embedding_dim, context_size):
         self.context_size = context_size
@@ -22,7 +23,24 @@ class NGramLanguageModeler(nn.Module):
         #out = self.linear2(out)
         log_probs = F.log_softmax(out, dim=0).view(1,self.vocab_size)
         return log_probs, embeds
-        
+def index_seq2vector_seq(input_seq, embedding):
+    output_seq = []
+    output_words = []
+    #print(len(input_seq[0][0]), "x", len(input_seq[0]), "x", len(input_seq))
+    for seq in input_seq.data:
+        for w in seq:
+            word_var = Variable(torch.LongTensor([w])).cuda() if USE_CUDA else Variable(torch.LongTensor([w]))
+            log_probs, word_vector = embedding(word_var)
+            word_vector = np.array(word_vector.data).tolist()
+            output_words.append(word_vector)
+        output_seq.append(output_words)
+        output_words = []
+    
+    #print(len(output_seq[0][0]), "x", len(output_seq[0]), "x", len(output_seq))
+    #print(type(output_seq))
+    output_seq = Variable(torch.FloatTensor(output_seq)).cuda() if USE_CUDA else Variable(torch.FloatTensor(output_seq))
+    return output_seq
+
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size, embedding, n_layers=1, dropout=0.1):
         super(EncoderRNN, self).__init__()
@@ -33,7 +51,8 @@ class EncoderRNN(nn.Module):
         self.gru = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
 
     def forward(self, input_seq, input_lengths, hidden=None):
-        log_probs, embedded = self.embedding(input_seq)
+        #log_probs, embedded = self.embedding(input_seq)
+        embedded = index_seq2vector_seq(input_seq, self.embedding)
         packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
         outputs, hidden = self.gru(packed, hidden) # output: (seq_len, batch, hidden*n_dir)
         outputs, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(outputs)
@@ -116,7 +135,8 @@ class LuongAttnDecoderRNN(nn.Module):
         # Note: we run this one step at a time
 
         # Get the embedding of the current input word (last output word)
-        log_probs, embedded = self.embedding(input_seq)
+        #log_probs, embedded = self.embedding(input_seq)
+        embedded = index_seq2vector_seq(input_seq, self.embedding)
         embedded = self.embedding_dropout(embedded) #[1, 64, 512]
         if(embedded.size(0) != 1):
             raise ValueError('Decoder input sequence length should be 1')
