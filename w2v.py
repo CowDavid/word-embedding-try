@@ -8,7 +8,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 from load import readVocs, loadPrepareData
 from load import SOS_token, EOS_token, PAD_token
-from train import batch2TrainData
+
 import argparse
 from config import MAX_LENGTH, USE_CUDA, teacher_forcing_ratio, save_dir
 from tqdm import tqdm
@@ -120,7 +120,13 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
         for context, target in trigrams:
             # Step 1. Prepare the inputs to be passed to the model (i.e, turn the words
             # into integer indices and wrap them in variables)
-            context_idxs = [voc.word2index[w] for w in context]
+            context_idxs = []
+            for w in context:
+                if w not in voc.word2index:
+                    context_idxs.append(voc.word2index['UNK'])
+                else:
+                    context_idxs.append(voc.word2index[w])
+            #context_idxs = [voc.word2index[w] for w in context]
             context_var = Variable(torch.LongTensor(context_idxs))
             # Step 2. Recall that torch *accumulates* gradients. Before passing in a
             # new instance, you need to zero out the gradients from the old
@@ -131,6 +137,9 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
             log_probs, embeds = model(context_var)
             # Step 4. Compute your loss function. (Again, Torch wants the target
             # word wrapped in a variable)
+            if target not in voc.word2index:
+                target = 'UNK'
+
             loss = loss_function(log_probs, Variable(
                 torch.LongTensor([voc.word2index[target]])))
             # Step 5. Do the backward pass and update the gradient
@@ -175,9 +184,14 @@ def test_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
         test_word = input('>')
         if test_word == 'q': break
         else:
-            embeds = get_word_vector(model, voc.index2word[int(test_word)], voc, EMBEDDING_DIM)
-            print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
-                voc.word2count[voc.index2word[int(test_word)]]))
+            try:
+                embeds = get_word_vector(model, voc.index2word[int(test_word)], voc, EMBEDDING_DIM)
+                print("Word freauency of '{}': {}".format(voc.index2word[int(test_word)], \
+                    voc.word2count[voc.index2word[int(test_word)]]))
+            except KeyError:
+                print("This index is vacant.")
+            except ValueError:
+                print("Please input an index.")
             #embeds = get_word_vector(model, test_word, voc, EMBEDDING_DIM)
             #print("The word vector of '{}': {}".format(test_word, embeds.data.view(1, EMBEDDING_DIM)))
 def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
@@ -222,6 +236,8 @@ def test_vector_relation(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
      _1st_word, _2nd_word, _3rd_word, _4th_word)) 
 def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
     try:
+        if test_word not in voc.word2index:
+            test_word = 'UNK'
         test_word_idxs = [voc.word2index[test_word]]
         test_word_var = Variable(torch.LongTensor(test_word_idxs))
         log_probs, embeds = model(test_word_var)
@@ -277,10 +293,9 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequenc
     vectors2D = np.array([new_word])
     start_word = 0
     index2vector = {start_word:new_word}
-    nb_words = voc.n_words
     below1000_count = 0
     #frequency_boundary = 1600
-    for i in range(start_word + 1, start_word + nb_words):
+    for i in range(voc.n_words):
         new_word = voc.index2word[i]
         if voc.word2count[new_word] <= frequency_boundary:
             below1000_count += 1
@@ -288,22 +303,23 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequenc
             labels.append(new_word)
             new_word = np.array(get_word_vector(model, new_word, voc, EMBEDDING_DIM).data)
             vectors2D = np.concatenate((vectors2D, [new_word]), axis = 0)
-        #index2vector[i] = [new_word]
+        index2vector[i] = [new_word]
     print("{} words out of {} words are in low frequency({} times).".format(\
         below1000_count, voc.n_words, frequency_boundary))
+    print("{} words left".format(voc.n_words - below1000_count))
     print("Shape of vectors2D: {}".format(vectors2D.shape))
-    file_name = '({}, {})b{}vectors2D.png'.format(start_word, \
-        start_word + nb_words-1, frequency_boundary)
-    tsne(corpus, nb_words, vectors2D, labels, file_name)
+    file_name = 'b{}vectors2D.png'.format(frequency_boundary)
+    tsne(corpus, voc.n_words, vectors2D, labels, file_name)
 def loss_graph(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     corpus_name = os.path.split(corpus)[-1].split('.')[0]
     checkpoint = torch.load(modelFile)
     losses = checkpoint['losses']
+    it = checkpoint['iteration']
     plt.plot(losses)
     directory = os.path.join(save_dir, 'w2v_image', corpus_name, 'loss_graph')
     if not os.path.exists(directory):
         os.makedirs(directory)
-    directory = os.path.join(directory,'d{}_loss_graph.png'.format(EMBEDDING_DIM))
+    directory = os.path.join(directory,'it{}d{}_loss_graph.png'.format(it, EMBEDDING_DIM))
     plt.savefig(directory, format='png')
 def predict_word(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     checkpoint = torch.load(modelFile)
