@@ -24,6 +24,14 @@ Train the seq2seq model with the pretrained word2vector model.
 python main.py -tr <CORPUS_FILE_PATH> -pre <PRETRAINED_MODEL_FILE_PATH> -la 1 -hi 300 -lr 0.0001 -it 50000 -b 64 -p 500 -s 1000
 ```
 > python main.py -tr ./data/movie_subtitles_en.txt -pre ./save/model/movie_subtitles_en/300/3000_backup_w2v_model.tar -la 1 -hi 300 -lr 0.0001 -it 50000 -b 64 -p 500 -s 1000
+### Test
+Test the seq2seq model
+#### test randomly
+```
+python main.py -te <SEQ2SEQ_MODEL_FILE_PATH> -pre .<PRETRAINED_MODEL_FILE_PATH> -c <CORPUS_FILE_PATH>
+```
+> python main.py -te ./save/model/movie_subtitles_en/1-1_300/26000_backup_bidir_model.tar -pre ./save/model/movie_subtitles_en/300/3000_backup_w2v_model.tar -c ./data/movie_subtitles_en.txt
+
 ### Word Frequency
 Input the index of a word, and then it prints out the times of the word appears in the corpus.
 ```
