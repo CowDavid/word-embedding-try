@@ -7,7 +7,11 @@ from load import MAX_LENGTH, loadPrepareData, Voc
 from model import *
 from config import USE_CUDA
 import sys
- 
+import os
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
+from config import MAX_LENGTH, USE_CUDA, teacher_forcing_ratio, save_dir
 class Sentence:
     def __init__(self, decoder_hidden, last_idx=SOS_token, sentence_idxes=[], sentence_scores=[]):
         if(len(sentence_idxes) != len(sentence_scores)):
@@ -154,15 +158,32 @@ def evaluateInput(encoder, decoder, voc, beam_size):
             print("Incorrect spelling.")
 
 
-def runTest(n_layers, hidden_size, reverse, modelFile, beam_size, input, corpus):
+def runTest(n_layers, pre_modelFile, hidden_size, reverse, modelFile, beam_size, input, corpus, diff_corpus):
 
     voc, pairs = loadPrepareData(corpus)
-    embedding = nn.Embedding(voc.n_words, hidden_size)
+    diff_voc, diff_pairs = loadPrepareData(diff_corpus)
+    #embedding = nn.Embedding(voc.n_words, hidden_size)
+    #-----------------------------------------------------------------
+    #my code
+    EMBEDDING_DIM = 300 #Should be the same as hidden_size!
+    if EMBEDDING_DIM != hidden_size:
+        sys.exit("EMBEDDING_DIM do not equal to hidden_size. Please correct it.")
+    CONTEXT_SIZE = 2
+    pre_checkpoint = torch.load(pre_modelFile)
+    pretrained_model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
+    pretrained_model.load_state_dict(pre_checkpoint['w2v'])
+    pretrained_model.train(False)
+    embedding = pretrained_model
+    if USE_CUDA:
+        embedding = embedding.cuda()
+    #-----------------------------------------------------------------
     encoder = EncoderRNN(voc.n_words, hidden_size, embedding, n_layers)
     attn_model = 'dot'
     decoder = LuongAttnDecoderRNN(attn_model, embedding, hidden_size, voc.n_words, n_layers)
-
-    checkpoint = torch.load(modelFile)
+    if USE_CUDA:
+        checkpoint = torch.load(modelFile)
+    else:
+        checkpoint = torch.load(modelFile, map_location='cpu')
     encoder.load_state_dict(checkpoint['en'])
     decoder.load_state_dict(checkpoint['de'])
     
@@ -177,4 +198,19 @@ def runTest(n_layers, hidden_size, reverse, modelFile, beam_size, input, corpus)
     if input:
         evaluateInput(encoder, decoder, voc, beam_size)
     else:
-        evaluateRandomly(encoder, decoder, voc, pairs, reverse, beam_size, 20)
+        evaluateRandomly(encoder, decoder, voc, diff_pairs, reverse, beam_size, 20)
+
+def loss_graph(modelFile, corpus, EMBEDDING_DIM):
+    corpus_name = os.path.split(corpus)[-1].split('.')[0]
+    if USE_CUDA:
+        checkpoint = torch.load(modelFile)
+    else:    
+        checkpoint = torch.load(modelFile, map_location='cpu')
+    losses = checkpoint['plt']
+    it = checkpoint['iteration']
+    plt.plot(losses)
+    directory = os.path.join(save_dir, 'seq2seq', corpus_name, 'loss_graph')
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    directory = os.path.join(directory,'it{}d{}_loss_graph.png'.format(it, EMBEDDING_DIM))
+    plt.savefig(directory, format='png')
