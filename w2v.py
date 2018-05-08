@@ -149,7 +149,7 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
         losses.append(total_loss)
         save_every = 500
         if (iteration % save_every == 0):
-            directory = os.path.join(save_dir, 'model', corpus_name, '{}'.format(hidden_size))
+            directory = os.path.join(save_dir, 'model', corpus_name, 'hi{}_ba{}'.format(hidden_size, batch_size))
             if not os.path.exists(directory):
                 os.makedirs(directory)
             torch.save({
@@ -164,7 +164,7 @@ def train_word_vector(corpus, n_iteration, hidden_size, context_size, learning_r
     print("Training completed!")
     print('\n')
     print("Loss: {}".format(losses))  # The loss decreased every iteration over the training data!
-    directory = os.path.join(save_dir, 'model', corpus_name, '{}'.format(hidden_size))
+    directory = os.path.join(save_dir, 'model', corpus_name, 'hi{}_ba{}'.format(hidden_size, batch_size))
     if not os.path.exists(directory):
         os.makedirs(directory)
     torch.save({
@@ -244,7 +244,7 @@ def get_word_vector(model, test_word, voc, EMBEDDING_DIM):
         return embeds
     except KeyError:
         print("Incorrect spelling or unseen word.")
-def draw_manually(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary):
+def draw_manually(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary, batch_size):
     checkpoint = torch.load(modelFile)
     voc, pairs = loadPrepareData(corpus)
     model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
@@ -260,8 +260,9 @@ def draw_manually(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boun
         vectors2D = np.concatenate((vectors2D, [new_word]), axis = 0)
     print("Shape of vectors2D: {}".format(vectors2D.shape))
     file_name = 'manually_{}2{}.png'.format(words[0], words[-1])
-    tsne(corpus, len(words), vectors2D, labels, file_name)
-def tsne(corpus, n_sne, vectors2D, labels, file_name):
+    iteration = os.path.split(modelFile)[-1].split('_')[0]
+    tsne(corpus, len(words), vectors2D, labels, file_name, iteration, batch_size, EMBEDDING_DIM)
+def tsne(corpus, n_sne, vectors2D, labels, file_name, iteration, batch_size, EMBEDDING_DIM):
     print("t-SNE processing...")
     time_start = time.time()
     tsne = TSNE()
@@ -276,12 +277,13 @@ def tsne(corpus, n_sne, vectors2D, labels, file_name):
             xy=(x, y), xytext=(0, 0),
             textcoords='offset points', ha='right', va='bottom',
             bbox=dict(boxstyle='round,pad=0', fc='yellow', alpha=0))
-    directory = os.path.join(save_dir, 'w2v_image', corpus_name)
+    hi_ba_it = "hi{}_ba{}_it{}".format(EMBEDDING_DIM, batch_size, iteration)
+    directory = os.path.join(save_dir, 'w2v_image', corpus_name, "manual_graph", hi_ba_it)
     if not os.path.exists(directory):
         os.makedirs(directory)
     directory = os.path.join(directory, file_name)
     plt.savefig(directory, format='png')
-def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary):
+def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequency_boundary, batch_size):
     checkpoint = torch.load(modelFile)
     voc, pairs = loadPrepareData(corpus)
     model = NGramLanguageModeler(voc.n_words, EMBEDDING_DIM, CONTEXT_SIZE)
@@ -309,7 +311,8 @@ def draw_2D_word_vector(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE, frequenc
     print("{} words left".format(voc.n_words - below1000_count))
     print("Shape of vectors2D: {}".format(vectors2D.shape))
     file_name = 'b{}vectors2D.png'.format(frequency_boundary)
-    tsne(corpus, voc.n_words, vectors2D, labels, file_name)
+    iteration = os.path.split(modelFile)[-1].split('_')[0]
+    tsne(corpus, voc.n_words, vectors2D, labels, file_name, iteration, batch_size, EMBEDDING_DIM)
 def loss_graph(modelFile, corpus, EMBEDDING_DIM, CONTEXT_SIZE):
     corpus_name = os.path.split(corpus)[-1].split('.')[0]
     checkpoint = torch.load(modelFile)
@@ -358,9 +361,9 @@ def run(args):
     elif args.test:
         test_word_vector(args.test, args.corpus, hidden_size, context_size)
     elif args.draw:
-        draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size, args.frequency_boundary)
+        draw_2D_word_vector(args.draw, args.corpus, hidden_size, context_size, args.frequency_boundary, batch_size)
     elif args.draw_manually:
-        draw_manually(args.draw_manually, args.corpus, hidden_size, context_size, args.frequency_boundary)
+        draw_manually(args.draw_manually, args.corpus, hidden_size, context_size, args.frequency_boundary, batch_size)
     elif args.test_vector_relation:
         test_vector_relation(args.test_vector_relation, args.corpus, hidden_size, context_size)
     elif args.loss:
